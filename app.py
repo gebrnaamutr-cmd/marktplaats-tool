@@ -49,7 +49,7 @@ if uploaded_file is not None:
                 
         # Directe link naar de Marktplaats plaatsingspagina
         st.markdown("---")
-        st.markdown("[🔗 Open Marktplaats Plaatsingspagina](https://www.marktplaats.nl/s/plaats-advertentie)")
+        st.markdown("[🔗 Open Marktplaats Plaatsingspagina](https://www.marktplaats.nl/m/my-account/sell/index.html)")
 else:
     # Voorbeeld download om te tonen hoe het CSV-bestand eruit moet zien
     st.markdown("### Voorbeeld van je CSV-indeling:")
