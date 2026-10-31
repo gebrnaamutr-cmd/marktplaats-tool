@@ -1,17 +1,23 @@
+from urllib.parse import urljoin
+from bs4 import BeautifulSoup
 import pandas as pd
+import requests
 import streamlit as st
 
 st.set_page_config(
-    page_title="Marktplaats & Veiling Tool", layout="wide", page_icon="🚀"
+    page_title="Marktplaats & Veiling Tool-Suite",
+    layout="wide",
+    page_icon="🚀",
 )
 
-# Hoofdmenu in de zijbalk om te schakelen tussen de twee tools
+# Zijbalk Navigatie
 st.sidebar.title("📌 Navigatie")
 app_mode = st.sidebar.selectbox(
     "Kies een tool",
     [
         "🔨 Veiling Arbitrage & Filter Tool",
         "📦 Marktplaats Bulk Manager",
+        "🔗 Webpagina Link Scraper",
     ],
 )
 
@@ -20,10 +26,7 @@ app_mode = st.sidebar.selectbox(
 # ==========================================
 if app_mode == "🔨 Veiling Arbitrage & Filter Tool":
   st.title("🔨 Veiling Arbitrage & Filter Tool")
-  st.caption(
-      "Filter rendabele kavels uit Troostwijk Auctions &"
-      " Onlineveilingmeester.nl"
-  )
+  st.caption("Analyseer en filter veilingkavels op winstgevendheid")
 
   st.sidebar.header("⚙️ Veiling Instellingen")
   gewenste_marge = (
@@ -45,7 +48,7 @@ if app_mode == "🔨 Veiling Arbitrage & Filter Tool":
   )
 
   tab1, tab2 = st.tabs(
-      ["🧮 Snelle Kavel Berekening", "📊 Bulk Filter & Batch Analyse"]
+      ["🧮 Snelle Kavel Berekening", "📊 Bulk Link & Batch Filter"]
   )
 
   with tab1:
@@ -55,6 +58,9 @@ if app_mode == "🔨 Veiling Arbitrage & Filter Tool":
     with col1:
       item_naam = st.text_input(
           "Naam van het item/kavel", "DeWalt Accuboormachine Set 18V"
+      )
+      veiling_link = st.text_input(
+          "Veiling Link (URL)", "https://www.troostwijkauctions.com/..."
       )
       categorie = st.selectbox(
           "Categorie",
@@ -123,17 +129,14 @@ if app_mode == "🔨 Veiling Arbitrage & Filter Tool":
     res_col3.metric("💰 Totale Inkoop", f"€{max_totale_kosten:.2f}")
     res_col4.metric("📈 Netto Winst", f"€{netto_winst:.2f}")
 
-    st.info(f"""
-        * **Populariteit NL:** {pop_nl}
-        * **Geschatte Verkooptijd (Marktplaats/Vinted):** {levertijd_nl}
-        * **Inkoopkorting vs. Nieuwprijs:** {korting_op_nieuw:.1f}% goedkoper dan de winkelwaarde
-        * **Inschatting Risico:** {base_risk}/10
-        """)
+    if veiling_link:
+      st.markdown(f"[🔗 Direct naar Veilingkavel]({veiling_link})")
 
   with tab2:
-    st.subheader("Bulk Kavels Filteren (CSV Upload)")
+    st.subheader("Bulk Veiling Filter via CSV")
     uploaded_file = st.file_uploader(
-        "Upload CSV met kolommen: item, nieuwprijs, resale_waarde, categorie",
+        "Upload CSV met kolommen: link, titel, nieuwprijs, resale_waarde,"
+        " categorie",
         type=["csv"],
     )
 
@@ -154,16 +157,16 @@ if app_mode == "🔨 Veiling Arbitrage & Filter Tool":
       filtered_df = df_veiling[df_veiling["Netto Winst"] >= min_winst]
 
       st.write(
-          f"### Gefilterde Resultaten ({len(filtered_df)} van"
-          f" {len(df_veiling)} items rendabel):"
+          f"### Gefilterde Rendabele Kavels ({len(filtered_df)} van"
+          f" {len(df_veiling)} items):"
       )
-      st.dataframe(filtered_df)
+      st.dataframe(filtered_df, use_container_width=True)
 
       csv_data = filtered_df.to_csv(index=False).encode("utf-8")
       st.download_button(
-          "📥 Download Rendabele Kavels als CSV",
+          "📥 Download Gefilterde Rendabele Kavels",
           csv_data,
-          "rendabele_kavels.csv",
+          "rendabele_veiling_kavels.csv",
           "text/csv",
       )
 
@@ -224,3 +227,46 @@ elif app_mode == "📦 Marktplaats Bulk Manager":
           "[🔗 Open Marktplaats"
           " Plaatsingspagina](https://www.marktplaats.nl/m/my-account/sell/index.html)"
       )
+
+# ==========================================
+# TOOL 3: WEBPAGINA LINK SCRAPER
+# ==========================================
+elif app_mode == "🔗 Webpagina Link Scraper":
+  st.title("🔗 Webpagina Link Scraper")
+  st.caption("Haal alle links op van een specifieke webpagina")
+
+  url_input = st.text_input(
+      "Voer de URL in van de pagina die je wilt scrappen:",
+      "https://example.com",
+  )
+
+  if st.button("Start Scrappen"):
+    if url_input:
+      with st.spinner("Bezig met ophalen van links..."):
+        try:
+          headers = {
+              "User-Agent": (
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                  " AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0"
+                  " Safari/537.36"
+              )
+          }
+          response = requests.get(url_input, headers=headers, timeout=10)
+
+          if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            found_links = set()
+            for a_tag in soup.find_all("a", href=True):
+              full_url = urljoin(url_input, a_tag["href"])
+              found_links.add(full_url)
+
+            st.success(f"Totaal {len(found_links)} unieke links gevonden!")
+            for idx, link in enumerate(sorted(found_links), 1):
+              st.write(f"{idx}. [{link}]({link})")
+          else:
+            st.error(
+                "Kan pagina niet bereiken. Statuscode:"
+                f" {response.status_code}"
+            )
+        except Exception as e:
+          st.error(f"Er is een fout opgetreden: {str(e)}")
