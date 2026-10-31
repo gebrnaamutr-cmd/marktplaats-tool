@@ -1,5 +1,5 @@
+from html.parser import HTMLParser
 from urllib.parse import urljoin
-from bs4 import BeautifulSoup
 import pandas as pd
 import requests
 import streamlit as st
@@ -9,6 +9,23 @@ st.set_page_config(
     layout="wide",
     page_icon="🚀",
 )
+
+
+# Eenvoudige, ingebouwde HTML Link Extractor (geen externe bs4 nodig)
+class SimpleLinkParser(HTMLParser):
+
+  def __init__(self, base_url):
+    super().__init__()
+    self.base_url = base_url
+    self.links = set()
+
+  def handle_starttag(self, tag, attrs):
+    if tag == "a":
+      for attr, value in attrs:
+        if attr == "href" and value:
+          full_url = urljoin(self.base_url, value)
+          self.links.add(full_url)
+
 
 # Zijbalk Navigatie
 st.sidebar.title("📌 Navigatie")
@@ -233,7 +250,9 @@ elif app_mode == "📦 Marktplaats Bulk Manager":
 # ==========================================
 elif app_mode == "🔗 Webpagina Link Scraper":
   st.title("🔗 Webpagina Link Scraper")
-  st.caption("Haal alle links op van een specifieke webpagina")
+  st.caption(
+      "Haal alle links op van een statische webpagina zonder externe pakketten"
+  )
 
   url_input = st.text_input(
       "Voer de URL in van de pagina die je wilt scrappen:",
@@ -254,14 +273,12 @@ elif app_mode == "🔗 Webpagina Link Scraper":
           response = requests.get(url_input, headers=headers, timeout=10)
 
           if response.status_code == 200:
-            soup = BeautifulSoup(response.text, "html.parser")
-            found_links = set()
-            for a_tag in soup.find_all("a", href=True):
-              full_url = urljoin(url_input, a_tag["href"])
-              found_links.add(full_url)
+            parser = SimpleLinkParser(url_input)
+            parser.feed(response.text)
 
+            found_links = sorted(list(parser.links))
             st.success(f"Totaal {len(found_links)} unieke links gevonden!")
-            for idx, link in enumerate(sorted(found_links), 1):
+            for idx, link in enumerate(found_links, 1):
               st.write(f"{idx}. [{link}]({link})")
           else:
             st.error(
